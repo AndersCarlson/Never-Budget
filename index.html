@@ -94,7 +94,7 @@ hr.hair{border:0;border-top:1px solid var(--rule);margin:0}
 .mk{grid-area:mk}.name{grid-area:name}.cells{grid-area:cells}.del{grid-area:del}.bar{grid-area:bar}.drag{grid-area:drag}
 .cells{display:grid;gap:0 12px;align-items:center}
 .sv .cells{grid-template-columns:104px 52px 104px}
-.bl .cells{grid-template-columns:104px 52px 104px 48px}
+.bl .cells{grid-template-columns:104px 52px 104px}
 .sp .cells{grid-template-columns:104px 104px 104px}
 
 .mk{width:14px;height:14px;padding:0;border:1.5px solid var(--rule);background:transparent;cursor:pointer}
@@ -120,11 +120,10 @@ input::placeholder{color:var(--soft)}
 .cells .ro{display:block;font-size:13px}
 .fld{display:block;min-width:0}
 .cells .ro.dimmed{color:var(--dim)}
-.cells .day{font-family:var(--mono);font-size:13px;text-align:right}
 .done .name,.done .num{opacity:.55}
 .grp{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);padding:12px 0 3px;border-bottom:1px solid var(--soft)}
 .sub-r{display:grid;grid-template-columns:18px 20px minmax(0,1fr) auto 26px;grid-template-areas:"drag mk name cells del";gap:0 10px;padding:5px 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-.sub-r .cells{grid-template-columns:104px 52px 104px 48px}
+.sub-r .cells{grid-template-columns:104px 52px 104px}
 .bar{height:2px;background:var(--soft);position:relative;margin:6px 0 0}
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--ink)}
 .bar.over i{background:repeating-linear-gradient(135deg,var(--flare) 0 3px,transparent 3px 6px)}
@@ -274,7 +273,7 @@ input::placeholder{color:var(--soft)}
   <section class="sec" id="bills">
     <div class="sechead"><span class="num">03</span><h2>Bills</h2><span class="tot" id="bills-tot">$0</span><span class="pct" id="bills-pct">0%</span></div>
     <div class="tbl">
-      <div class="r hd bl"><i class="drag"></i><i class="mk"></i><span class="name">Line</span><div class="cells"><span class="num">Monthly</span><span class="num">%</span><span class="num">Per check</span><span class="day">Day</span></div><i class="del"></i></div>
+      <div class="r hd bl"><i class="drag"></i><i class="mk"></i><span class="name">Line</span><div class="cells"><span class="num">Monthly</span><span class="num">%</span><span class="num">Per check</span></div><i class="del"></i></div>
       <div id="bills-rows"></div>
     </div>
     <button class="add" data-add="bills">+ Add bill</button>
@@ -342,19 +341,19 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 function template(){
   var t=[
     ['save','Roth IRA'],['save','401(k)'],['save','Brokerage'],['save','Cash savings'],
-    ['bills','Mortgage or rent',1,''],
-    ['bills','Health insurance (pre-tax)',1,''],
-    ['bills','Phone',1,''],
-    ['bills','Water',1,''],['bills','Trash',1,''],['bills','Power',1,''],
-    ['bills','Internet',1,''],['bills','Streaming',1,''],
-    ['bills','Gym',1,''],['bills','Car insurance',1,''],
+    ['bills','Mortgage or rent'],
+    ['bills','Health insurance (pre-tax)'],
+    ['bills','Phone'],
+    ['bills','Water'],['bills','Trash'],['bills','Power'],
+    ['bills','Internet'],['bills','Streaming'],
+    ['bills','Gym'],['bills','Car insurance'],
     ['spend','Groceries'],['spend','Eating out'],['spend','Gas'],
     ['spend','Auto & transport'],['spend','Travel'],['spend','Pet costs'],
     ['spend','Home'],['spend','Entertainment'],['spend','Shopping'],
     ['spend','Uncategorized']
   ];
   return {income:0,paychecks:2,rows:t.map(function(x){
-    return {id:uid(),sec:x[0],name:x[1],day:x[2]||1,grp:x[3]||'',amt:0,spent:0,done:false};
+    return {id:uid(),sec:x[0],name:x[1],grp:'',amt:0,spent:0,done:false};
   })};
 }
 
@@ -472,12 +471,6 @@ function buildRow(r){
   }else{
     cells.appendChild(cell('ro dimmed pctcell','%'));
     cells.appendChild(cell('ro percell','Per check'));
-    if(r.sec==='bills'){
-      var dyF=field('day','Day','1'),dy=dyF.inp;dy.inputMode='numeric';dy.value=r.day||'';
-      dy.addEventListener('input',function(){r.day=clamp(Math.round(pnum(dy.value))||1,1,31);commit()});
-      dy.addEventListener('blur',function(){dy.value=r.day});
-      cells.appendChild(dyF);
-    }
   }
   row.appendChild(cells);
 
@@ -577,7 +570,6 @@ function paint(){
     }else{
       row.querySelector('.pctcell').textContent=(D.inc?pct(r.amt,D.inc).toFixed(1):'0.0')+'%';
       row.querySelector('.percell').textContent=money((+r.amt||0)/D.pc,true);
-      var dn=row.querySelector('.day');if(dn)setVal(dn,String(r.day||1));
     }
   });
   Array.prototype.forEach.call(document.querySelectorAll('.sub-r'),function(st){
@@ -648,6 +640,37 @@ function li(label,value,isSum){
 }
 function emptyNote(ul,txt){var d=document.createElement('div');d.className='empty';d.textContent=txt;ul.appendChild(d)}
 
+function csvCell(v){v=String(v==null?'':v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function csvText(){
+  var D=derive(),m=meta(MONTH),out=[],LBL={save:'Savings',bills:'Bills',spend:'Spending'};
+  out.push(['Never Budget',m.label]);
+  out.push(['Post-tax monthly',D.inc]);
+  out.push(['Paychecks per month',D.pc]);
+  out.push([]);
+  out.push(['Section','Line','Amount','% of income','Per paycheck','Spent','Remaining','Marked']);
+  ['save','bills','spend'].forEach(function(sec){
+    rowsOf(sec).forEach(function(r){
+      out.push([LBL[sec],r.name,r.amt,
+        (D.inc?pct(r.amt,D.inc).toFixed(1):'0.0')+'%',
+        ((+r.amt||0)/D.pc).toFixed(2),
+        r.spent,
+        sec==='spend'?((+r.amt||0)-(+r.spent||0)):'',
+        r.done?'yes':'no']);
+    });
+  });
+  out.push([]);
+  out.push(['Summary','Amount','% of income']);
+  [['Savings',D.save],['Bills',D.bill],['Spending',D.spend],['Unallocated',D.remain]].forEach(function(x){
+    out.push([x[0],x[1],pct(x[1],D.inc).toFixed(1)+'%']);
+  });
+  out.push(['Spent so far',D.spent,'']);
+  out.push(['Left to spend',D.left,'']);
+  out.push(['Days left',m.cur?Math.max(1,m.left):m.days,'']);
+  out.push([]);
+  out.push(['Balance needed on the 1st',D.bill+D.save/2+D.spend/2,'']);
+  out.push(['Balance needed on the 15th',D.save/2+D.spend/2,'']);
+  return out.map(function(r){return r.map(csvCell).join(',')}).join('\r\n');
+}
 function paintAuto(D){
   /* Bills all leave on the 1st; savings and spending split evenly over the 1st and 15th. */
   var payday=$('#a-payday'),first=$('#a-first'),mid=$('#a-fifteenth');
@@ -684,7 +707,7 @@ function adopt(d){
   if(!d||!Array.isArray(d.rows)){S=template();return}
   S={income:+d.income||0,paychecks:Math.max(1,Math.round(+d.paychecks||2)),
      rows:d.rows.map(function(r){return {id:r.id||uid(),sec:r.sec,name:r.name||'',
-       day:clamp(Math.round(+r.day||1),1,31),grp:r.grp||'',amt:+r.amt||0,spent:+r.spent||0,done:!!r.done}})
+       grp:r.grp||'',amt:+r.amt||0,spent:+r.spent||0,done:!!r.done}})
        .filter(function(r){return r.sec==='save'||r.sec==='bills'||r.sec==='spend'})};
 }
 
@@ -757,7 +780,7 @@ $('#next').addEventListener('click',function(){openMonth(shiftMonth(MONTH,1))});
 Array.prototype.forEach.call(document.querySelectorAll('.add'),function(b){
   b.addEventListener('click',function(){
     var sec=b.dataset.add,list=rowsOf(sec),last=list[list.length-1];
-    var r={id:uid(),sec:sec,name:'',day:last?last.day:1,grp:'',amt:0,spent:0,done:false};
+    var r={id:uid(),sec:sec,name:'',grp:'',amt:0,spent:0,done:false};
     var idx=last?S.rows.lastIndexOf(last):-1;
     if(idx<0)S.rows.push(r);else S.rows.splice(idx+1,0,r);
     buildAll();commit();
